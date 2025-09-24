@@ -211,32 +211,52 @@ def show_risk_analysis():
     risk_level = latest_data['risk_level'] if latest_data else 'Low'
     probability = latest_data['probability'] if latest_data else 0.1
 
-    # Generate a realistic mountain using a Gaussian hill
-    x = np.linspace(-20, 20, 100)
-    y = np.linspace(-20, 20, 100)
+    # Generate a realistic, non-spiky mountain (no random spikes, fully opaque)
+    x = np.linspace(-20, 20, 120)
+    y = np.linspace(-20, 20, 120)
     x, y = np.meshgrid(x, y)
-    z = 12 * np.exp(-0.015 * (x**2 + y**2)) + 2 * np.sin(0.2 * x) * np.cos(0.2 * y)
+    z = 13 * np.exp(-0.012 * (x**2 + y**2))
+    z += 2.5 * np.exp(-0.2 * ((x-8)**2 + (y+6)**2))
+    z += 2.0 * np.exp(-0.18 * ((x+10)**2 + (y-10)**2))
+    for cx, cy, amp, spread in [(-12, 8, 2.2, 0.18), (15, -12, 1.7, 0.22), (0, 15, 1.5, 0.15)]:
+        z += amp * np.exp(-spread * ((x-cx)**2 + (y-cy)**2))
+    z -= 2.5 * np.exp(-0.09 * ((x+7)**2 + (y+7)**2))
+    z -= 2.0 * np.exp(-0.11 * ((x-13)**2 + (y+13)**2))
+    z += 0.7 * np.sin(0.18 * x) * np.cos(0.18 * y)
 
-    # Place a rock at the top, about to fall
-    rock_x = 0
-    rock_y = 0
-    rock_z = 12  # Top of the mountain
+    # Place a rock at the top, about to fall (find max z)
+    max_idx = np.unravel_index(np.argmax(z, axis=None), z.shape)
+    rock_x = x[max_idx]
+    rock_y = y[max_idx]
+    rock_z = z[max_idx]
 
     # Simulate a short predicted path down the slope
-    path_x = np.linspace(rock_x, 12 * np.sin(np.radians(slope_angle)), 10)
-    path_y = np.linspace(rock_y, 12 * np.cos(np.radians(slope_angle)), 10)
-    path_z = 12 - np.linspace(0, 8, 10)  # Descending
+    path_x = np.linspace(rock_x, rock_x + 10 * np.sin(np.radians(slope_angle)), 12)
+    path_y = np.linspace(rock_y, rock_y + 10 * np.cos(np.radians(slope_angle)), 12)
+    path_z = np.linspace(rock_z, rock_z - 8, 12)
 
     fig3d = go.Figure()
     # Mountain surface
-    fig3d.add_trace(go.Surface(z=z, x=x, y=y, colorscale='Earth', opacity=0.85, name='Mountain'))
-    # Rock (large marker)
-    fig3d.add_trace(go.Scatter3d(
-        x=[rock_x], y=[rock_y], z=[rock_z+0.5],
-        mode='markers',
-        marker=dict(size=16, color='gray', symbol='circle'),
-        name='Rock (about to fall)'
+    fig3d.add_trace(go.Surface(z=z, x=x, y=y, colorscale='Earth', opacity=1.0, name='Mountain', lighting=dict(ambient=0.5, diffuse=0.7, roughness=0.7, specular=0.2), lightposition=dict(x=100, y=200, z=100)))
+
+    # Rock as a 3D sphere mesh
+    u = np.linspace(0, 2 * np.pi, 30)
+    v = np.linspace(0, np.pi, 30)
+    rock_radius = 1.2
+    rock_xs = rock_x + rock_radius * np.outer(np.cos(u), np.sin(v))
+    rock_ys = rock_y + rock_radius * np.outer(np.sin(u), np.sin(v))
+    rock_zs = rock_z + rock_radius * np.outer(np.ones(np.size(u)), np.cos(v))
+    fig3d.add_trace(go.Surface(
+        x=rock_xs, y=rock_ys, z=rock_zs,
+        surfacecolor=np.ones_like(rock_zs),
+        colorscale=[[0, '#888888'], [1, '#444444']],
+        showscale=False,
+        opacity=1.0,
+        name='Rock',
+        lighting=dict(ambient=0.3, diffuse=0.9, roughness=0.8, specular=0.7),
+        lightposition=dict(x=100, y=200, z=100)
     ))
+
     # Rockfall path
     fig3d.add_trace(go.Scatter3d(
         x=path_x, y=path_y, z=path_z,
@@ -245,6 +265,7 @@ def show_risk_analysis():
         line=dict(color='red', width=5),
         name='Predicted Rockfall Path'
     ))
+
     # Annotate main parameters
     param_text = (
         f"<b>Parameters Affecting Rockfall:</b><br>"
@@ -259,7 +280,7 @@ def show_risk_analysis():
     )
     # Place annotation near the rock
     fig3d.add_trace(go.Scatter3d(
-        x=[rock_x+5], y=[rock_y+5], z=[rock_z+2],
+        x=[rock_x+6], y=[rock_y+6], z=[rock_z+3],
         mode='text',
         text=[param_text],
         textposition='top right',
@@ -271,11 +292,14 @@ def show_risk_analysis():
             yaxis_title='North-South (m)',
             zaxis_title='Elevation (m)',
             aspectratio=dict(x=1, y=1, z=0.5),
-            camera=dict(eye=dict(x=1.5, y=1.5, z=1.1))
+            camera=dict(eye=dict(x=1.7, y=1.7, z=1.1)),
+            bgcolor='black'
         ),
         margin=dict(l=0, r=0, b=0, t=30),
-        height=550,
-        title="Interactive 3D Mountain, Rock, and Dynamic Parameters"
+        height=570,
+        title="Interactive 3D Mountain, Realistic Rock, and Dynamic Parameters",
+        paper_bgcolor='black',
+        plot_bgcolor='black'
     )
     st.plotly_chart(fig3d, use_container_width=True)
 
