@@ -192,22 +192,99 @@ def show_current_status():
 def show_risk_analysis():
     """Display risk heatmap and detailed analysis"""
     
-    st.subheader(" Risk Analysis")
-    
-    # Add 3D Map Visualization
-    st.subheader("3D Mine Site Visualization")
-    st.markdown(
-        f'<iframe src="https://lovable.dev/projects/35cbc61a-de3b-49f4-99d1-04c102cb68e5" width="100%" height="600" scrolling="yes"></iframe>',
-        unsafe_allow_html=True
+    st.subheader("Risk Analysis")
+
+    # Realistic 3D Mountain Visualizer with Dynamic Rock and Parameters
+    st.subheader("3D Realistic Mountain & Rockfall Visualizer")
+    import plotly.graph_objects as go
+    import numpy as np
+
+    # Get latest prediction data for dynamic parameters
+    latest_data = st.session_state.prediction_data[-1] if st.session_state.prediction_data else None
+    # Default values if no data
+    temp = latest_data['temperature'] if latest_data else 25.0
+    humidity = latest_data['humidity'] if latest_data else 50.0
+    rainfall = latest_data['rainfall'] if latest_data else 0.0
+    wind_speed = latest_data['wind_speed'] if latest_data else 5.0
+    soil_moisture = latest_data['soil_moisture'] if latest_data else 20.0
+    slope_angle = latest_data['slope_angle'] if latest_data else 30.0
+    risk_level = latest_data['risk_level'] if latest_data else 'Low'
+    probability = latest_data['probability'] if latest_data else 0.1
+
+    # Generate a realistic mountain using a Gaussian hill
+    x = np.linspace(-20, 20, 100)
+    y = np.linspace(-20, 20, 100)
+    x, y = np.meshgrid(x, y)
+    z = 12 * np.exp(-0.015 * (x**2 + y**2)) + 2 * np.sin(0.2 * x) * np.cos(0.2 * y)
+
+    # Place a rock at the top, about to fall
+    rock_x = 0
+    rock_y = 0
+    rock_z = 12  # Top of the mountain
+
+    # Simulate a short predicted path down the slope
+    path_x = np.linspace(rock_x, 12 * np.sin(np.radians(slope_angle)), 10)
+    path_y = np.linspace(rock_y, 12 * np.cos(np.radians(slope_angle)), 10)
+    path_z = 12 - np.linspace(0, 8, 10)  # Descending
+
+    fig3d = go.Figure()
+    # Mountain surface
+    fig3d.add_trace(go.Surface(z=z, x=x, y=y, colorscale='Earth', opacity=0.85, name='Mountain'))
+    # Rock (large marker)
+    fig3d.add_trace(go.Scatter3d(
+        x=[rock_x], y=[rock_y], z=[rock_z+0.5],
+        mode='markers',
+        marker=dict(size=16, color='gray', symbol='circle'),
+        name='Rock (about to fall)'
+    ))
+    # Rockfall path
+    fig3d.add_trace(go.Scatter3d(
+        x=path_x, y=path_y, z=path_z,
+        mode='lines+markers',
+        marker=dict(size=6, color='red'),
+        line=dict(color='red', width=5),
+        name='Predicted Rockfall Path'
+    ))
+    # Annotate main parameters
+    param_text = (
+        f"<b>Parameters Affecting Rockfall:</b><br>"
+        f"Temperature: {temp:.1f}°C<br>"
+        f"Humidity: {humidity:.1f}%<br>"
+        f"Rainfall: {rainfall:.1f} mm<br>"
+        f"Wind Speed: {wind_speed:.1f} km/h<br>"
+        f"Soil Moisture: {soil_moisture:.1f}%<br>"
+        f"Slope Angle: {slope_angle:.1f}°<br>"
+        f"Risk Level: {risk_level}<br>"
+        f"Probability: {probability:.1%}"
     )
-    
+    # Place annotation near the rock
+    fig3d.add_trace(go.Scatter3d(
+        x=[rock_x+5], y=[rock_y+5], z=[rock_z+2],
+        mode='text',
+        text=[param_text],
+        textposition='top right',
+        showlegend=False
+    ))
+    fig3d.update_layout(
+        scene=dict(
+            xaxis_title='East-West (m)',
+            yaxis_title='North-South (m)',
+            zaxis_title='Elevation (m)',
+            aspectratio=dict(x=1, y=1, z=0.5),
+            camera=dict(eye=dict(x=1.5, y=1.5, z=1.1))
+        ),
+        margin=dict(l=0, r=0, b=0, t=30),
+        height=550,
+        title="Interactive 3D Mountain, Rock, and Dynamic Parameters"
+    )
+    st.plotly_chart(fig3d, use_container_width=True)
+
     col1, col2 = st.columns([2, 1])
-    
+
     with col1:
         # Risk heatmap
         st.subheader("Risk Heatmap")
         heatmap_data = create_risk_heatmap()
-        
         fig = px.imshow(
             heatmap_data,
             color_continuous_scale='RdYlGn_r',
@@ -220,15 +297,13 @@ def show_risk_analysis():
             coloraxis_colorbar_title="Risk Score"
         )
         st.plotly_chart(fig, use_container_width=True)
-    
+
     with col2:
         # Risk distribution
         if st.session_state.prediction_data:
             recent_data = st.session_state.prediction_data[-20:] if len(st.session_state.prediction_data) >= 20 else st.session_state.prediction_data
             risk_levels = [d['risk_level'] for d in recent_data]
-            
             risk_counts = pd.Series(risk_levels).value_counts()
-            
             fig = px.pie(
                 values=risk_counts.values,
                 names=risk_counts.index,
