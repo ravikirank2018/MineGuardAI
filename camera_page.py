@@ -246,7 +246,6 @@ class CameraPage:
         # Camera controls
         st.sidebar.header("Camera Controls")
         camera_options = {
-            "Upload Image": None,
             "Live Camera": 0,
             "Drone Feed": 1
         }
@@ -263,7 +262,6 @@ class CameraPage:
             "French": "french"
         }
         selected_language = st.sidebar.selectbox("Alert Language", list(languages.keys()))
-
         selected_source = st.sidebar.selectbox("Camera Source", list(camera_options.keys()))
 
         def handle_frame(frame, mode_caption):
@@ -278,58 +276,16 @@ class CameraPage:
                     nav_text = f"Please follow the green route on the map to the nearest safe zone. Evacuate immediately via Route A or B as shown."
                     self.speak_alert(nav_text)
 
-        if selected_source == "Upload Image":
-            uploaded_file = st.file_uploader("Choose an image...", type=['jpg', 'jpeg', 'png'], key=f"uploader_{time.time()}")
-            if uploaded_file is not None:
-                current_file = uploaded_file.name if uploaded_file else None
-                if current_file != st.session_state.last_uploaded_file:
-                    while not self.alert_queue.empty():
-                        self.alert_queue.get()
-                    st.session_state.last_uploaded_file = current_file
-                # Debug: Confirm upload path is reached
-                st.info(f"File '{current_file}' uploaded. Proceeding to decode...")
-                file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-                st.text(f"Debug: file_bytes shape: {file_bytes.shape}, dtype: {file_bytes.dtype}")
-                if file_bytes.size == 0:
-                    st.warning("Uploaded file is empty or could not be read. Please try again.")
-                    return
-                frame = cv2.imdecode(file_bytes, 1)
-                if frame is None:
-                    st.error("Failed to decode image. Please upload a valid image file.")
-                    st.text(f"Debug: file_bytes shape: {file_bytes.shape}, dtype: {file_bytes.dtype}")
-                    return
-                st.info("Image decoded successfully. Proceeding to analysis...")
-                handle_frame(frame, "Uploaded Image")
-                # Add prediction record for dashboard compatibility
-                try:
-                    prediction_record = {
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'probability': probability,
-                        'risk_level': risk_level,
-                        'temperature': 25.0,  # Placeholder/defaults
-                        'humidity': 50.0,
-                        'rainfall': 0.0,
-                        'wind_speed': 5.0,
-                        'soil_moisture': 20.0,
-                        'slope_angle': 30.0
-                    }
-                    if 'prediction_data' not in st.session_state:
-                        st.session_state.prediction_data = []
-                    st.session_state.prediction_data.append(prediction_record)
-                    if len(st.session_state.prediction_data) > 100:
-                        st.session_state.prediction_data = st.session_state.prediction_data[-100:]
-                except Exception as e:
-                    st.warning(f"Could not add prediction record for dashboard: {e}")
+            # Upload Image option and logic removed
+        if st.sidebar.button("Toggle Camera"):
+            st.session_state.camera_active = not st.session_state.camera_active
+            st.session_state.camera_source = camera_options[selected_source]
+        if st.session_state.camera_active:
+            try:
+                frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+                handle_frame(frame, "Live Feed")
+            except Exception as e:
+                st.error(f"Error accessing camera: {str(e)}")
+                st.session_state.camera_active = False
         else:
-            if st.sidebar.button("Toggle Camera"):
-                st.session_state.camera_active = not st.session_state.camera_active
-                st.session_state.camera_source = camera_options[selected_source]
-            if st.session_state.camera_active:
-                try:
-                    frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
-                    handle_frame(frame, "Live Feed")
-                except Exception as e:
-                    st.error(f"Error accessing camera: {str(e)}")
-                    st.session_state.camera_active = False
-            else:
-                st.info("Camera is currently inactive. Click 'Toggle Camera' to start.")
+            st.info("Camera is currently inactive. Click 'Toggle Camera' to start.")

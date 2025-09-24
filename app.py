@@ -224,28 +224,70 @@ def show_risk_analysis():
     z -= 2.0 * np.exp(-0.11 * ((x-13)**2 + (y+13)**2))
     z += 0.7 * np.sin(0.18 * x) * np.cos(0.18 * y)
 
-    # Place a rock at the top, about to fall (find max z)
-    max_idx = np.unravel_index(np.argmax(z, axis=None), z.shape)
-    rock_x = x[max_idx]
-    rock_y = y[max_idx]
-    rock_z = z[max_idx]
+    # Add a button to simulate environmental changes
+    st.markdown("<br>", unsafe_allow_html=True)
+    if 'rock_slid' not in st.session_state:
+        st.session_state.rock_slid = False
+    simulate_env = st.button('Simulate Environmental Change (Rainfall, Heat, etc.)')
+    if simulate_env:
+        st.session_state.rock_slid = True
 
-    # Simulate a short predicted path down the slope
-    path_x = np.linspace(rock_x, rock_x + 10 * np.sin(np.radians(slope_angle)), 12)
-    path_y = np.linspace(rock_y, rock_y + 10 * np.cos(np.radians(slope_angle)), 12)
-    path_z = np.linspace(rock_z, rock_z - 8, 12)
+    # Place the rock just below the top (visibly near the summit)
+    top_idx = np.unravel_index(np.argmax(z, axis=None), z.shape)
+    stuck_idx = (max(top_idx[0]-8,0), max(top_idx[1]-8,0))
+    rock_x0 = x[stuck_idx]
+    rock_y0 = y[stuck_idx]
+    rock_z0 = z[stuck_idx]
+
+    # Compute the local gradient at the rock's initial position
+    dzdx, dzdy = np.gradient(z, x[0,1]-x[0,0], y[1,0]-y[0,0])
+    grad_x = dzdx[stuck_idx]
+    grad_y = dzdy[stuck_idx]
+    # Steepest descent direction (negative gradient)
+    direction = -np.array([grad_x, grad_y])
+    direction = direction / (np.linalg.norm(direction) + 1e-8)
+
+    # Project the path in the direction of steepest descent
+    num_steps = 16 if st.session_state.rock_slid else 8
+    step_size = 2.5  # meters per step
+    path_x = [rock_x0]
+    path_y = [rock_y0]
+    path_z = [rock_z0]
+    for i in range(1, num_steps):
+        next_x = path_x[-1] + direction[0]*step_size
+        next_y = path_y[-1] + direction[1]*step_size
+        # Find nearest grid point for z
+        xi = np.abs(x[0,:] - next_x).argmin()
+        yi = np.abs(y[:,0] - next_y).argmin()
+        next_z = z[yi, xi]
+        path_x.append(next_x)
+        path_y.append(next_y)
+        path_z.append(next_z)
+    path_x = np.array(path_x)
+    path_y = np.array(path_y)
+    path_z = np.array(path_z)
+    if st.session_state.rock_slid:
+        rock_x = path_x[-1]
+        rock_y = path_y[-1]
+        rock_z = path_z[-1]
+    else:
+        rock_x = rock_x0
+        rock_y = rock_y0
+        rock_z = rock_z0
 
     fig3d = go.Figure()
     # Mountain surface
     fig3d.add_trace(go.Surface(z=z, x=x, y=y, colorscale='Earth', opacity=1.0, name='Mountain', lighting=dict(ambient=0.5, diffuse=0.7, roughness=0.7, specular=0.2), lightposition=dict(x=100, y=200, z=100)))
 
-    # Rock as a 3D sphere mesh
+    # Rock as an irregular ellipsoid mesh (not a perfect sphere)
     u = np.linspace(0, 2 * np.pi, 30)
     v = np.linspace(0, np.pi, 30)
     rock_radius = 1.2
-    rock_xs = rock_x + rock_radius * np.outer(np.cos(u), np.sin(v))
-    rock_ys = rock_y + rock_radius * np.outer(np.sin(u), np.sin(v))
-    rock_zs = rock_z + rock_radius * np.outer(np.ones(np.size(u)), np.cos(v))
+    # Add some irregularity to the rock shape
+    noise = 0.18 * np.sin(3*u)[:,None] * np.cos(2*v)[None,:]
+    rock_xs = rock_x + rock_radius * (1.1 + noise) * np.outer(np.cos(u), np.sin(v))
+    rock_ys = rock_y + rock_radius * (0.8 + 0.7*noise) * np.outer(np.sin(u), np.sin(v))
+    rock_zs = rock_z + rock_radius * (0.7 + 0.5*noise) * np.outer(np.ones(np.size(u)), np.cos(v))
     fig3d.add_trace(go.Surface(
         x=rock_xs, y=rock_ys, z=rock_zs,
         surfacecolor=np.ones_like(rock_zs),
@@ -257,7 +299,7 @@ def show_risk_analysis():
         lightposition=dict(x=100, y=200, z=100)
     ))
 
-    # Rockfall path
+    # Rockfall path with arrow at the end
     fig3d.add_trace(go.Scatter3d(
         x=path_x, y=path_y, z=path_z,
         mode='lines+markers',
@@ -265,6 +307,27 @@ def show_risk_analysis():
         line=dict(color='red', width=5),
         name='Predicted Rockfall Path'
     ))
+    # Add an arrow at the end of the path
+    if len(path_x) > 1:
+        # Arrow direction: from second-last to last point
+        arrow_start = np.array([path_x[-2], path_y[-2], path_z[-2]])
+        arrow_end = np.array([path_x[-1], path_y[-1], path_z[-1]])
+        arrow_vec = arrow_end - arrow_start
+        arrow_len = np.linalg.norm(arrow_vec)
+        if arrow_len > 0:
+            arrow_dir = arrow_vec / arrow_len
+            # Arrow head size
+            ah = 1.5
+            # Create arrow head points
+            arrow_base = arrow_end - ah * arrow_dir
+            fig3d.add_trace(go.Scatter3d(
+                x=[arrow_base[0], arrow_end[0]],
+                y=[arrow_base[1], arrow_end[1]],
+                z=[arrow_base[2], arrow_end[2]],
+                mode='lines',
+                line=dict(color='yellow', width=10),
+                showlegend=False
+            ))
 
     # Annotate main parameters
     param_text = (
@@ -553,7 +616,7 @@ def show_model_training():
     with col1:
         st.markdown("""
         The system uses a hybrid approach:
-        - **CNN Model**: Analyzes DEM images for visual patterns
+        - **KNN Model**: Analyzes DEM images for visual patterns
         - **Random Forest**: Processes tabular data (weather, soil, geological)
         - **Ensemble**: Combines predictions for final risk assessment
         """)
@@ -704,7 +767,7 @@ def show_settings():
     
     with info_col2:
         st.markdown("**File System:**")
-        st.write(f"- CNN Model: {'Found' if os.path.exists(CNN_MODEL_PATH) else 'Missing'}")
+        st.write(f"- KNN Model: {'Found' if os.path.exists(CNN_MODEL_PATH) else 'Missing'}")
         st.write(f"- RF Model: {'Found' if os.path.exists(RF_MODEL_PATH) else 'Missing'}")
         st.write(f"- Scaler: {'Found' if os.path.exists(SCALER_PATH) else 'Missing'}")
 
