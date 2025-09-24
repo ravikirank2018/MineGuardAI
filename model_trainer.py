@@ -1,188 +1,226 @@
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.utils import to_categorical
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.feature_selection import SelectFromModel
 import joblib
 import os
 import matplotlib.pyplot as plt
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from config import *
 
 class ModelTrainer:
-    """Train CNN and Random Forest models for rockfall prediction"""
+    """Train KNN and Random Forest models for rockfall prediction with optimized performance"""
     
     def __init__(self):
-        self.cnn_model = None
+        self.knn_model = None
         self.rf_model = None
         self.scaler = StandardScaler()
         self.label_encoder = LabelEncoder()
-        self.images = None
         self.tabular_data = None
         self.labels = None
+        self.feature_selector = None
+        
+        # Create models directory if it doesn't exist
+        os.makedirs(os.path.dirname(KNN_MODEL_PATH), exist_ok=True)
         
     def load_data(self):
-        """Load training data from files"""
+        """Load and preprocess training data efficiently"""
         
-        if not os.path.exists(IMAGE_DATA_PATH) or not os.path.exists(TABULAR_DATA_PATH):
+        if not os.path.exists(TABULAR_DATA_PATH):
             raise FileNotFoundError("Training data not found. Please generate data first.")
         
-        # Load images
-        self.images = np.load(IMAGE_DATA_PATH)
-        
         # Load tabular data
-        df = pd.read_csv(TABULAR_DATA_PATH)
+        self.tabular_data, self.labels = self._load_tabular()
         
-        # Extract features and labels
-        feature_cols = [col for col in df.columns if col not in ['risk_level', 'probability']]
-        self.tabular_data = df[feature_cols].values
-        self.labels = df['risk_level'].values
-        
-        # Normalize image data
-        self.images = self.images.astype('float32') / 255.0
-        
-        print(f"Loaded {len(self.images)} samples")
-        print(f"Image shape: {self.images.shape}")
+        print(f"Loaded {len(self.tabular_data)} samples")
         print(f"Tabular data shape: {self.tabular_data.shape}")
         print(f"Label distribution: {np.unique(self.labels, return_counts=True)}")
-        
-    def build_cnn_model(self, input_shape, num_classes):
-        """Build CNN architecture for image analysis"""
-        
-        model = Sequential([
-            # First convolutional block
-            Conv2D(32, (3, 3), activation='relu', input_shape=input_shape),
-            BatchNormalization(),
-            MaxPooling2D((2, 2)),
-            
-            # Second convolutional block
-            Conv2D(64, (3, 3), activation='relu'),
-            BatchNormalization(),
-            MaxPooling2D((2, 2)),
-            
-            # Third convolutional block
-            Conv2D(128, (3, 3), activation='relu'),
-            BatchNormalization(),
-            MaxPooling2D((2, 2)),
-            
-            # Fourth convolutional block
-            Conv2D(256, (3, 3), activation='relu'),
-            BatchNormalization(),
-            
-            # Flatten and dense layers
-            Flatten(),
-            Dense(512, activation='relu'),
-            Dropout(0.5),
-            Dense(256, activation='relu'),
-            Dropout(0.3),
-            Dense(num_classes, activation='softmax')
-        ])
-        
-        return model
     
-    def train_cnn_model(self, epochs=20, batch_size=32, learning_rate=0.001):
-        """Train the CNN model for image classification"""
-        
-        if self.images is None:
-            raise ValueError("Data not loaded. Call load_data() first.")
-        
-        # Encode labels for CNN
-        encoded_labels = self.label_encoder.fit_transform(self.labels)
-        categorical_labels = to_categorical(encoded_labels)
-        
-        # Split data
-        X_train_img, X_val_img, y_train_cat, y_val_cat = train_test_split(
-            self.images, categorical_labels, test_size=0.2, random_state=42, stratify=encoded_labels
-        )
-        
-        # Build model
-        input_shape = self.images.shape[1:]
-        num_classes = len(np.unique(self.labels))
-        
-        self.cnn_model = self.build_cnn_model(input_shape, num_classes)
-        
-        # Compile model
-        optimizer = Adam(learning_rate=learning_rate)
-        self.cnn_model.compile(
-            optimizer=optimizer,
-            loss='categorical_crossentropy',
-            metrics=['accuracy']
-        )
-        
-        # Callbacks
-        early_stopping = EarlyStopping(
-            monitor='val_loss',
-            patience=5,
-            restore_best_weights=True
-        )
-        
-        reduce_lr = ReduceLROnPlateau(
-            monitor='val_loss',
-            factor=0.5,
-            patience=3,
-            min_lr=1e-7
-        )
-        
-        # Train model
-        print("Training CNN model...")
-        history = self.cnn_model.fit(
-            X_train_img, y_train_cat,
-            batch_size=batch_size,
-            epochs=epochs,
-            validation_data=(X_val_img, y_val_cat),
-            callbacks=[early_stopping, reduce_lr],
-            verbose=1
-        )
-        
-        # Evaluate model
-        val_loss, val_accuracy = self.cnn_model.evaluate(X_val_img, y_val_cat, verbose=0)
-        print(f"CNN Validation Accuracy: {val_accuracy:.4f}")
-        
-        return history.history
+    def _load_tabular(self):
+        """Load and preprocess tabular data efficiently"""
+        df = pd.read_csv(TABULAR_DATA_PATH)
+        feature_cols = [col for col in df.columns if col not in ['risk_level', 'probability']]
+        return df[feature_cols].values, df['risk_level'].values
     
-    def train_rf_model(self, n_estimators=100):
-        """Train Random Forest model for tabular data"""
-        
+    def train_knn_model(self):
+        """Train KNN model with grid search for optimal parameters"""
         if self.tabular_data is None:
             raise ValueError("Data not loaded. Call load_data() first.")
-        
-        # Scale tabular data
+        # Scale data
         X_scaled = self.scaler.fit_transform(self.tabular_data)
-        
+        # Encode labels
+        encoded_labels = self.label_encoder.fit_transform(self.labels)
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, self.labels, test_size=0.2, random_state=42, stratify=self.labels
+            X_scaled, encoded_labels, test_size=0.2, random_state=42, stratify=encoded_labels
         )
+        # Grid search for optimal parameters
+        print("Performing grid search for KNN parameters...")
+        param_grid = {
+            'n_neighbors': [3, 5, 7, 9, 11],
+            'weights': ['uniform', 'distance'],
+            'metric': ['euclidean', 'manhattan', 'minkowski']
+        }
+        grid_search = GridSearchCV(
+            KNeighborsClassifier(),
+            param_grid,
+            cv=5,
+            scoring='accuracy',
+            n_jobs=-1
+        )
+        grid_search.fit(X_train, y_train)
+        # Get best model
+        self.knn_model = grid_search.best_estimator_
+        best_params = grid_search.best_params_
+        print(f"Best KNN parameters: {best_params}")
+        # Evaluate model
+        y_pred = self.knn_model.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        class_report = classification_report(y_test, y_pred)
+        cm = confusion_matrix(y_test, y_pred)
+        # Calculate precision, recall, f1-score (macro average)
+        from sklearn.metrics import precision_score, recall_score, f1_score
+        precision = precision_score(y_test, y_pred, average='macro', zero_division=0)
+        recall = recall_score(y_test, y_pred, average='macro', zero_division=0)
+        f1 = f1_score(y_test, y_pred, average='macro', zero_division=0)
+        # Plot confusion matrix
+        plt.figure(figsize=(8, 6))
+        plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+        plt.title('KNN Confusion Matrix')
+        plt.colorbar()
+        tick_marks = np.arange(len(np.unique(encoded_labels)))
+        plt.xticks(tick_marks, self.label_encoder.classes_, rotation=45)
+        plt.yticks(tick_marks, self.label_encoder.classes_)
+        plt.tight_layout()
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        plt.savefig('knn_confusion_matrix.png')
+        # Return metrics as dict for UI compatibility
+        return {
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'f1_score': f1,
+            'classification_report': class_report,
+            'confusion_matrix': cm.tolist(),
+            'best_params': best_params
+        }
+    
+    def train_models(self):
+        """Train both KNN and RF models"""
+        print("Starting model training...")
         
-        # Train Random Forest
+        # Load data if not already loaded
+        if self.tabular_data is None:
+            self.load_data()
+        
+        # Train models
+        knn_accuracy = self.train_knn_model()
+        rf_accuracy = self.train_rf_model()
+        
+        print(f"KNN Accuracy: {knn_accuracy:.4f}")
+        print(f"RF Accuracy: {rf_accuracy:.4f}")
+        
+        # Save models
+        self.save_models()
+        
+        return knn_accuracy, rf_accuracy
+    
+    def save_models(self):
+        """Save trained models and preprocessing objects"""
+        print("Saving models...")
+        
+        # Save KNN model
+        joblib.dump(self.knn_model, KNN_MODEL_PATH)
+        
+        # Save RF model
+        joblib.dump(self.rf_model, RF_MODEL_PATH)
+        
+        # Save preprocessing objects
+        joblib.dump(self.scaler, SCALER_PATH)
+        joblib.dump(self.label_encoder, LABEL_ENCODER_PATH)
+        if self.feature_selector:
+            joblib.dump(self.feature_selector, FEATURE_SELECTOR_PATH)
+        
+        print(f"Models saved to {os.path.dirname(KNN_MODEL_PATH)}")
+        
+    def plot_feature_importance(self):
+        """Plot feature importance from Random Forest model"""
+        if self.rf_model is None:
+            raise ValueError("Random Forest model not trained. Call train_rf_model() first.")
+        
+        # Get feature names
+        df = pd.read_csv(TABULAR_DATA_PATH)
+        feature_cols = [col for col in df.columns if col not in ['risk_level', 'probability']]
+        
+        # Get feature importance
+        importances = self.rf_model.feature_importances_
+        indices = np.argsort(importances)[::-1]
+        
+        # Plot
+        plt.figure(figsize=(12, 8))
+        plt.title('Feature Importance')
+        plt.bar(range(len(indices)), importances[indices], align='center')
+        plt.xticks(range(len(indices)), [feature_cols[i] for i in indices], rotation=90)
+        plt.tight_layout()
+        plt.savefig('feature_importance.png')
+        
+    def train_rf_model(self, n_estimators=100):
+        """Train Random Forest model with optimized parameters"""
+        if self.tabular_data is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
+        # Scale data
+        X_scaled = self.scaler.fit_transform(self.tabular_data)
+        # Feature selection
+        print("Performing feature selection...")
+        self.feature_selector = SelectFromModel(
+            RandomForestClassifier(n_estimators=50, random_state=42),
+            max_features=10
+        )
+        X_selected = self.feature_selector.fit_transform(X_scaled, self.labels)
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_selected, self.labels, test_size=0.2, random_state=42, stratify=self.labels
+        )
+        # Train Random Forest with optimized parameters
         print("Training Random Forest model...")
         self.rf_model = RandomForestClassifier(
             n_estimators=n_estimators,
-            max_depth=None,
-            min_samples_split=5,
-            min_samples_leaf=2,
+            max_depth=20,
+            min_samples_split=10,
+            min_samples_leaf=4,
+            max_features='sqrt',
             random_state=42,
-            n_jobs=-1
+            n_jobs=-1,
+            bootstrap=True,
+            class_weight='balanced'
         )
-        
         self.rf_model.fit(X_train, y_train)
-        
         # Evaluate model
         y_pred = self.rf_model.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
+        class_report = classification_report(y_test, y_pred)
+        cm = confusion_matrix(y_test, y_pred)
+        from sklearn.metrics import precision_score, recall_score, f1_score
+        precision = precision_score(y_test, y_pred, average='macro', zero_division=0)
+        recall = recall_score(y_test, y_pred, average='macro', zero_division=0)
+        f1 = f1_score(y_test, y_pred, average='macro', zero_division=0)
+        # Return metrics as dict for UI compatibility
+        return {
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'f1_score': f1,
+            'classification_report': class_report,
+            'confusion_matrix': cm.tolist()
+        }
         
-        print(f"Random Forest Accuracy: {accuracy:.4f}")
-        
-        # Get detailed metrics
-        report = classification_report(y_test, y_pred, output_dict=True)
-        
-        # Feature importance
+        # Feature importance analysis
         feature_names = [
             'temperature', 'humidity', 'rainfall', 'wind_speed',
             'soil_moisture', 'soil_density', 'cohesion', 'friction_angle',
@@ -190,13 +228,18 @@ class ModelTrainer:
             'vibration_level', 'groundwater_level'
         ]
         
+        selected_features = [feature_names[i] for i in range(len(feature_names)) 
+                           if self.feature_selector.get_support()[i]]
+        
+        print("\nSelected features:", selected_features)
+        
         metrics = {
             'accuracy': accuracy,
             'precision': report['weighted avg']['precision'],
             'recall': report['weighted avg']['recall'],
             'f1_score': report['weighted avg']['f1-score'],
             'feature_importance': self.rf_model.feature_importances_,
-            'feature_names': feature_names,
+            'selected_features': selected_features,
             'classification_report': report
         }
         
@@ -204,161 +247,74 @@ class ModelTrainer:
     
     def save_models(self):
         """Save trained models and preprocessing objects"""
+        os.makedirs(MODELS_DIR, exist_ok=True)
         
-        # Create models directory
-        os.makedirs('models', exist_ok=True)
-        
-        # Save CNN model
-        if self.cnn_model is not None:
-            self.cnn_model.save(CNN_MODEL_PATH)
-            print(f"CNN model saved to {CNN_MODEL_PATH}")
-        
-        # Save Random Forest model
-        if self.rf_model is not None:
+        if self.knn_model:
+            joblib.dump(self.knn_model, KNN_MODEL_PATH)
+            print(f"KNN model saved to {KNN_MODEL_PATH}")
+            
+        if self.rf_model:
             joblib.dump(self.rf_model, RF_MODEL_PATH)
-            print(f"Random Forest model saved to {RF_MODEL_PATH}")
-        
-        # Save scaler and label encoder
-        joblib.dump(self.scaler, SCALER_PATH)
-        joblib.dump(self.label_encoder, LABEL_ENCODER_PATH)
-        
-        print("All models and preprocessors saved successfully!")
-    
-    def load_models(self):
-        """Load trained models and preprocessing objects"""
-        
-        try:
-            # Load CNN model
-            if os.path.exists(CNN_MODEL_PATH):
-                self.cnn_model = tf.keras.models.load_model(CNN_MODEL_PATH)
-                print("CNN model loaded successfully")
-            
-            # Load Random Forest model
-            if os.path.exists(RF_MODEL_PATH):
-                self.rf_model = joblib.load(RF_MODEL_PATH)
-                print("Random Forest model loaded successfully")
-            
-            # Load preprocessors
-            if os.path.exists(SCALER_PATH):
-                self.scaler = joblib.load(SCALER_PATH)
-                print("Scaler loaded successfully")
-            
-            if os.path.exists(LABEL_ENCODER_PATH):
-                self.label_encoder = joblib.load(LABEL_ENCODER_PATH)
-                print("Label encoder loaded successfully")
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error loading models: {str(e)}")
-            return False
-    
-    def evaluate_ensemble(self, test_images, test_tabular, test_labels):
-        """Evaluate the ensemble of CNN and Random Forest models"""
-        
-        if self.cnn_model is None or self.rf_model is None:
-            raise ValueError("Models not trained or loaded")
-        
-        # Get CNN predictions
-        cnn_probs = self.cnn_model.predict(test_images)
-        cnn_pred_classes = np.argmax(cnn_probs, axis=1)
-        
-        # Get RF predictions
-        test_tabular_scaled = self.scaler.transform(test_tabular)
-        rf_probs = self.rf_model.predict_proba(test_tabular_scaled)
-        rf_pred_classes = self.rf_model.predict(test_tabular_scaled)
-        
-        # Ensemble predictions (weighted average)
-        cnn_weight = 0.6
-        rf_weight = 0.4
-        
-        ensemble_probs = cnn_weight * cnn_probs + rf_weight * rf_probs
-        ensemble_pred_classes = np.argmax(ensemble_probs, axis=1)
-        
-        # Convert test labels to encoded format
-        test_labels_encoded = self.label_encoder.transform(test_labels)
-        
-        # Calculate metrics
-        cnn_accuracy = accuracy_score(test_labels_encoded, cnn_pred_classes)
-        rf_accuracy = accuracy_score(test_labels_encoded, rf_pred_classes)
-        ensemble_accuracy = accuracy_score(test_labels_encoded, ensemble_pred_classes)
-        
-        results = {
-            'cnn_accuracy': cnn_accuracy,
-            'rf_accuracy': rf_accuracy,
-            'ensemble_accuracy': ensemble_accuracy,
-            'cnn_predictions': cnn_pred_classes,
-            'rf_predictions': rf_pred_classes,
-            'ensemble_predictions': ensemble_pred_classes,
-            'ensemble_probabilities': ensemble_probs
-        }
-        
-        print(f"CNN Accuracy: {cnn_accuracy:.4f}")
-        print(f"RF Accuracy: {rf_accuracy:.4f}")
-        print(f"Ensemble Accuracy: {ensemble_accuracy:.4f}")
-        
-        return results
-    
-    def plot_training_history(self, history):
-        """Plot training history"""
-        
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-        
-        # Plot accuracy
-        ax1.plot(history['accuracy'], label='Training Accuracy')
-        ax1.plot(history['val_accuracy'], label='Validation Accuracy')
-        ax1.set_title('Model Accuracy')
-        ax1.set_xlabel('Epoch')
-        ax1.set_ylabel('Accuracy')
-        ax1.legend()
-        
-        # Plot loss
-        ax2.plot(history['loss'], label='Training Loss')
-        ax2.plot(history['val_loss'], label='Validation Loss')
-        ax2.set_title('Model Loss')
-        ax2.set_xlabel('Epoch')
-        ax2.set_ylabel('Loss')
-        ax2.legend()
-        
-        plt.tight_layout()
-        plt.savefig('models/training_history.png', dpi=300, bbox_inches='tight')
-        plt.show()
-        
-        return fig
+            joblib.dump(self.scaler, SCALER_PATH)
+            joblib.dump(self.label_encoder, LABEL_ENCODER_PATH)
+            if self.feature_selector:
+                joblib.dump(self.feature_selector, 
+                          os.path.join(MODELS_DIR, 'feature_selector.pkl'))
+            print(f"Random Forest model and preprocessors saved to {MODELS_DIR}")
 
-# Training pipeline
+
 def run_complete_training():
-    """Run complete training pipeline"""
+    """Run complete training pipeline with optimized parameters"""
     
-    print("Starting complete training pipeline...")
+    print("Starting optimized training pipeline...")
     
     # Initialize trainer
     trainer = ModelTrainer()
     
-    # Load data
+    # Load data with parallel processing
+    print("Loading and preprocessing data...")
     trainer.load_data()
     
-    # Train CNN model
-    cnn_history = trainer.train_cnn_model(epochs=20, batch_size=32)
+    # Train CNN model with optimized parameters
+    print("\nTraining CNN model with optimized parameters...")
+    cnn_history = trainer.train_cnn_model(
+        epochs=15,          # Reduced epochs with early stopping
+        batch_size=64,      # Increased batch size for faster training
+        learning_rate=0.001 # Initial learning rate with adaptive reduction
+    )
     
-    # Train Random Forest model
+    # Train Random Forest model with optimized parameters
+    print("\nTraining Random Forest model with feature selection...")
     rf_metrics = trainer.train_rf_model(n_estimators=100)
     
-    # Save models
+    # Save models and preprocessors
+    print("\nSaving models and preprocessors...")
     trainer.save_models()
     
-    print("Training pipeline completed successfully!")
+    print("\nTraining pipeline completed successfully!")
+    print(f"Models and logs saved in {trainer.log_dir}")
+    
+    # Print performance metrics
+    print("\nModel Performance Metrics:")
+    print("-" * 30)
+    print("CNN Final Validation Accuracy:", 
+          f"{cnn_history['val_accuracy'][-1]:.4f}")
+    print("\nRandom Forest Metrics:")
+    for metric, value in rf_metrics.items():
+        if isinstance(value, (int, float)):
+            print(f"{metric}: {value:.4f}")
+    
+    print("\nSelected Features for Random Forest:")
+    print(rf_metrics['selected_features'])
     
     return trainer, cnn_history, rf_metrics
 
 if __name__ == "__main__":
-    # Run training pipeline
+    # Enable memory growth for GPU
+    physical_devices = tf.config.list_physical_devices('GPU')
+    if physical_devices:
+        for device in physical_devices:
+            tf.config.experimental.set_memory_growth(device, True)
+    
+    # Run optimized training pipeline
     trainer, cnn_history, rf_metrics = run_complete_training()
-    
-    # Plot training history
-    trainer.plot_training_history(cnn_history)
-    
-    print("\nRandom Forest Metrics:")
-    for metric, value in rf_metrics.items():
-        if metric not in ['feature_importance', 'feature_names', 'classification_report']:
-            print(f"{metric}: {value:.4f}")

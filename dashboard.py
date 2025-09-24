@@ -28,7 +28,7 @@ class Dashboard:
     
     def render_header(self):
         """Render dashboard header"""
-        st.title("🏔️ AI Rockfall Prediction Dashboard")
+        st.title("AI Rockfall Prediction Dashboard")
         st.markdown("*Real-time monitoring and risk assessment for open-pit mine safety*")
         
         # Status indicators
@@ -36,33 +36,33 @@ class Dashboard:
         
         with col1:
             if self.predictor and self.predictor.cnn_model is not None:
-                st.success("🤖 AI Models: Ready")
+                st.success("AI Models: Ready")
             else:
-                st.error("🤖 AI Models: Not Ready")
+                st.error("AI Models: Not Ready")
         
         with col2:
             current_time = datetime.now().strftime("%H:%M:%S")
-            st.info(f"🕐 Last Update: {current_time}")
+            st.info(f" Last Update: {current_time}")
         
         with col3:
             if 'prediction_data' in st.session_state and st.session_state.prediction_data:
                 latest_data = st.session_state.prediction_data[-1]
                 risk_level = latest_data['risk_level']
                 color = get_risk_color(risk_level)
-                st.markdown(f"🎯 Current Risk: <span style='color:{color}'><strong>{risk_level}</strong></span>", unsafe_allow_html=True)
+                st.markdown(f"Current Risk: <span style='color:{color}'><strong>{risk_level}</strong></span>", unsafe_allow_html=True)
             else:
-                st.warning("🎯 Current Risk: No Data")
+                st.warning("Current Risk: No Data")
         
         with col4:
             if 'live_mode' in st.session_state and st.session_state.live_mode:
-                st.success("📡 Live Mode: ON")
+                st.success("Live Mode: ON")
             else:
-                st.info("📡 Live Mode: OFF")
+                st.info("Live Mode: OFF")
     
     def render_current_conditions(self):
         """Render current environmental conditions"""
         
-        st.subheader("🌡️ Current Environmental Conditions")
+        st.subheader("Current Environmental Conditions")
         
         if not st.session_state.prediction_data:
             st.warning("No current data available")
@@ -106,7 +106,7 @@ class Dashboard:
             )
         
         # Soil and geological conditions
-        st.subheader("🌱 Soil & Geological Conditions")
+        st.subheader("Soil & Geological Conditions")
         
         col1, col2, col3 = st.columns(3)
         
@@ -145,14 +145,14 @@ class Dashboard:
                     red 60%, red 100%); 
                     height: 20px; border-radius: 10px; position: relative;'>
                     <div style='position: absolute; left: {probability*100:.1f}%; 
-                        top: -5px; font-size: 30px;'>⬇️</div>
+                        top: -5px; font-size: 30px;'></div>
                 </div>
             """, unsafe_allow_html=True)
     
     def render_risk_heatmap(self):
         """Render risk heatmap visualization"""
         
-        st.subheader("🗺️ Mine Site Risk Heatmap")
+        st.subheader("Mine Site Risk Heatmap")
         
         # Generate heatmap data
         heatmap_data = create_risk_heatmap()
@@ -178,7 +178,7 @@ class Dashboard:
             y, x = high_risk_coords[0][i], high_risk_coords[1][i]
             fig.add_annotation(
                 x=x, y=y,
-                text="⚠️",
+                text="",
                 showarrow=False,
                 font=dict(size=20)
             )
@@ -193,16 +193,16 @@ class Dashboard:
         low_risk_percent = 100 - high_risk_percent - medium_risk_percent
         
         with col1:
-            st.metric("🟢 Low Risk Areas", f"{low_risk_percent:.1f}%")
+            st.metric("Low Risk Areas", f"{low_risk_percent:.1f}%")
         with col2:
-            st.metric("🟡 Medium Risk Areas", f"{medium_risk_percent:.1f}%")
+            st.metric("Medium Risk Areas", f"{medium_risk_percent:.1f}%")
         with col3:
-            st.metric("🔴 High Risk Areas", f"{high_risk_percent:.1f}%")
+            st.metric("High Risk Areas", f"{high_risk_percent:.1f}%")
     
     def render_historical_trends(self):
         """Render historical trends and patterns"""
         
-        st.subheader("📈 Historical Trends & Analysis")
+        st.subheader("Historical Trends & Analysis")
         
         if len(st.session_state.prediction_data) < 5:
             st.info("Collecting more data points to show meaningful trends...")
@@ -260,7 +260,7 @@ class Dashboard:
             st.plotly_chart(fig, use_container_width=True)
         
         # Correlation analysis
-        st.subheader("🔍 Weather-Risk Correlation Analysis")
+        st.subheader("Weather-Risk Correlation Analysis")
         
         # Create correlation heatmap
         numeric_cols = ['probability', 'temperature', 'humidity', 'rainfall', 'wind_speed', 'soil_moisture', 'slope_angle']
@@ -277,7 +277,7 @@ class Dashboard:
         st.plotly_chart(fig, use_container_width=True)
         
         # Key insights
-        st.subheader("💡 Key Insights")
+        st.subheader("Key Insights")
         
         # Calculate some insights
         avg_probability = df['probability'].mean()
@@ -287,16 +287,16 @@ class Dashboard:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.info(f"📊 Average Risk: {avg_probability:.1%}")
+            st.info(f"Average Risk: {avg_probability:.1%}")
         with col2:
-            st.warning(f"⚠️ Peak Risk: {max_probability:.1%}")
+            st.warning(f"Peak Risk: {max_probability:.1%}")
         with col3:
-            st.error(f"🚨 High Risk Periods: {high_risk_periods}")
+            st.error(f"High Risk Periods: {high_risk_periods}")
     
     def render_alert_system(self):
         """Render alert system and recommendations"""
         
-        st.subheader("🚨 Alert System & Recommendations")
+        st.subheader("Alert System & Recommendations")
         
         if not st.session_state.prediction_data:
             st.warning("No data available for alerts")
@@ -308,39 +308,39 @@ class Dashboard:
         
         # Current alert status
         if risk_level == 'High':
-            st.error("🚨 **HIGH RISK ALERT**")
+            st.error("**HIGH RISK ALERT**")
             st.markdown(f"**Current Probability:** {probability:.1%}")
             
             st.markdown("### Immediate Actions Required:")
-            st.markdown("- ⛔ **EVACUATE** personnel from high-risk areas immediately")
+            st.markdown("- **EVACUATE** personnel from high-risk areas immediately")
             st.markdown("- 📞 **ALERT** emergency response team and mine safety officer")
-            st.markdown("- 🔒 **RESTRICT** access to unstable slopes and danger zones")
-            st.markdown("- 📡 **INCREASE** monitoring frequency to continuous mode")
-            st.markdown("- 📋 **DOCUMENT** all actions taken for safety compliance")
+            st.markdown("-  **RESTRICT** access to unstable slopes and danger zones")
+            st.markdown("-  **INCREASE** monitoring frequency to continuous mode")
+            st.markdown("-  **DOCUMENT** all actions taken for safety compliance")
             
         elif risk_level == 'Medium':
-            st.warning("⚠️ **MEDIUM RISK WARNING**")
+            st.warning("**MEDIUM RISK WARNING**")
             st.markdown(f"**Current Probability:** {probability:.1%}")
             
             st.markdown("### Recommended Actions:")
-            st.markdown("- 👥 **REDUCE** personnel in potentially affected areas")
-            st.markdown("- 🔍 **INCREASE** visual inspections and patrols")
-            st.markdown("- 📡 **ENHANCE** sensor monitoring and data collection")
-            st.markdown("- 📋 **REVIEW** safety protocols and evacuation routes")
-            st.markdown("- 💬 **BRIEF** all personnel on current risk status")
+            st.markdown("-  **REDUCE** personnel in potentially affected areas")
+            st.markdown("-  **INCREASE** visual inspections and patrols")
+            st.markdown("-  **ENHANCE** sensor monitoring and data collection")
+            st.markdown("- **REVIEW** safety protocols and evacuation routes")
+            st.markdown("- **BRIEF** all personnel on current risk status")
             
         else:
-            st.success("✅ **NORMAL OPERATIONS**")
+            st.success(" **NORMAL OPERATIONS**")
             st.markdown(f"**Current Probability:** {probability:.1%}")
             
             st.markdown("### Standard Procedures:")
-            st.markdown("- ✅ **CONTINUE** normal mining operations")
-            st.markdown("- 🔄 **MAINTAIN** standard monitoring procedures")
-            st.markdown("- 📅 **CONDUCT** routine safety inspections")
-            st.markdown("- 📊 **MONITOR** trends and environmental changes")
+            st.markdown("- **CONTINUE** normal mining operations")
+            st.markdown("- **MAINTAIN** standard monitoring procedures")
+            st.markdown("-  **CONDUCT** routine safety inspections")
+            st.markdown("- **MONITOR** trends and environmental changes")
         
         # Recent alerts log
-        st.subheader("📋 Recent Alerts History")
+        st.subheader("Recent Alerts History")
         
         # Filter recent high/medium risk events
         recent_alerts = []
@@ -359,7 +359,7 @@ class Dashboard:
             alerts_df = pd.DataFrame(recent_alerts)
             st.dataframe(alerts_df, use_container_width=True)
         else:
-            st.success("✅ No recent alerts - system operating normally")
+            st.success("No recent alerts - system operating normally")
         
         # Alert statistics
         if len(st.session_state.prediction_data) >= 10:
@@ -378,28 +378,28 @@ class Dashboard:
     def render_system_status(self):
         """Render system status and diagnostics"""
         
-        st.subheader("⚙️ System Status")
+        st.subheader("System Status")
         
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("**Model Status:**")
             if self.predictor:
-                cnn_status = "✅ Ready" if self.predictor.cnn_model is not None else "❌ Not Ready"
-                rf_status = "✅ Ready" if self.predictor.rf_model is not None else "❌ Not Ready"
-                scaler_status = "✅ Ready" if self.predictor.scaler is not None else "❌ Not Ready"
+                cnn_status = "Ready" if self.predictor.cnn_model is not None else "Not Ready"
+                rf_status = "Ready" if self.predictor.rf_model is not None else "Not Ready"
+                scaler_status = "Ready" if self.predictor.scaler is not None else "Not Ready"
                 
                 st.write(f"- CNN Model: {cnn_status}")
                 st.write(f"- Random Forest: {rf_status}")
                 st.write(f"- Data Scaler: {scaler_status}")
             else:
-                st.write("- All Models: ❌ Not Initialized")
+                st.write("- All Models: Not Initialized")
         
         with col2:
             st.markdown("**Data Status:**")
             prediction_count = len(st.session_state.prediction_data) if 'prediction_data' in st.session_state else 0
             st.write(f"- Prediction Records: {prediction_count}")
-            st.write(f"- Live Mode: {'✅ Active' if st.session_state.get('live_mode', False) else '❌ Inactive'}")
+            st.write(f"- Live Mode: {' Active' if st.session_state.get('live_mode', False) else 'Inactive'}")
             
             if prediction_count > 0:
                 latest_time = st.session_state.prediction_data[-1]['timestamp']
@@ -418,7 +418,7 @@ class Dashboard:
     def render_live_controls(self):
         """Render live monitoring controls"""
         
-        st.sidebar.subheader("🎛️ Live Monitoring Controls")
+        st.sidebar.subheader("Live Monitoring Controls")
         
         # Auto-refresh toggle
         live_mode = st.sidebar.toggle(
@@ -429,18 +429,18 @@ class Dashboard:
         st.session_state.live_mode = live_mode
         
         # Manual refresh button
-        if st.sidebar.button("🔄 Refresh Now", use_container_width=True):
+        if st.sidebar.button("Refresh Now", use_container_width=True):
             self.generate_new_prediction()
             st.rerun()
         
         # Clear history button
-        if st.sidebar.button("🗑️ Clear History", use_container_width=True):
+        if st.sidebar.button("Clear History", use_container_width=True):
             st.session_state.prediction_data = []
             st.success("History cleared!")
             st.rerun()
         
         # Data export
-        if st.sidebar.button("📥 Export Data", use_container_width=True):
+        if st.sidebar.button("Export Data", use_container_width=True):
             if 'prediction_data' in st.session_state and st.session_state.prediction_data:
                 df = pd.DataFrame(st.session_state.prediction_data)
                 csv = df.to_csv(index=False)
@@ -452,7 +452,7 @@ class Dashboard:
                 )
         
         # System settings
-        st.sidebar.subheader("⚙️ Alert Settings")
+        st.sidebar.subheader("Alert Settings")
         
         high_threshold = st.sidebar.slider(
             "High Risk Threshold",

@@ -47,7 +47,13 @@ LOGS_DIR = "logs"
 for directory in [DATA_DIR, MODELS_DIR, LOGS_DIR]:
     os.makedirs(directory, exist_ok=True)
 
-# Data file paths
+# Model file paths
+IMAGE_DATA_PATH = os.path.join(DATA_DIR, "image_data.npy")
+TABULAR_DATA_PATH = os.path.join(DATA_DIR, "tabular_data.csv")
+KNN_MODEL_PATH = os.path.join(MODELS_DIR, "knn_model.joblib")
+RF_MODEL_PATH = os.path.join(MODELS_DIR, "rf_model.joblib")
+SCALER_PATH = os.path.join(MODELS_DIR, "scaler.joblib")
+LABEL_ENCODER_PATH = os.path.join(MODELS_DIR, "label_encoder.joblib")
 IMAGE_DATA_PATH = os.path.join(DATA_DIR, "dem_images.npy")
 TABULAR_DATA_PATH = os.path.join(DATA_DIR, "tabular_features.csv")
 WEATHER_DATA_PATH = os.path.join(DATA_DIR, "weather_data.csv")

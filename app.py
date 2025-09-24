@@ -15,6 +15,7 @@ import joblib
 import tensorflow as tf
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
+import random
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -23,6 +24,7 @@ from data_generator import RockfallDataGenerator
 from model_trainer import ModelTrainer
 from predictor import RockfallPredictor
 from dashboard import Dashboard
+from camera_page import CameraPage
 from utils import create_risk_heatmap, format_probability, get_risk_color
 from config import *
 
@@ -41,23 +43,37 @@ if 'last_update' not in st.session_state:
 def main():
     st.set_page_config(
         page_title="AI Rockfall Prediction System",
-        page_icon="🏔️",
+        page_icon=None,
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
-    st.title("🏔️ AI-Based Rockfall Prediction & Alert System")
+    st.title("AI-Based Rockfall Prediction & Alert System")
     st.markdown("*Advanced machine learning system for open-pit mine safety*")
     
     # Sidebar navigation
     st.sidebar.title("Navigation")
+    
+    # Cache page components to improve switching performance
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = "Dashboard"
+        
     page = st.sidebar.selectbox(
         "Choose a section:",
-        ["Dashboard", "Data Generation", "Model Training", "System Settings"]
+        ["Dashboard", "Live Camera & Alerts", "Data Generation", "Model Training", "System Settings"],
+        key="page_selector"
     )
     
+    # Only reload components if page has changed
+    if page != st.session_state.current_page:
+        st.session_state.current_page = page
+        
     if page == "Dashboard":
         show_dashboard()
+    elif page == "Live Camera & Alerts":
+        if 'camera_page' not in st.session_state:
+            st.session_state.camera_page = CameraPage()
+        st.session_state.camera_page.render_page()
     elif page == "Data Generation":
         show_data_generation()
     elif page == "Model Training":
@@ -70,19 +86,19 @@ def show_dashboard():
     
     # Check if system is ready
     if not st.session_state.data_generated:
-        st.warning("⚠️ Please generate training data first in the Data Generation section.")
+        st.warning("Please generate training data first in the Data Generation section.")
         return
     
     if not st.session_state.model_trained:
-        st.warning("⚠️ Please train the model first in the Model Training section.")
+        st.warning("Please train the model first in the Model Training section.")
         return
     
     # Live mode toggle
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        st.subheader("🎯 Real-time Rockfall Monitoring")
+        st.subheader("Real-time Rockfall Monitoring")
     with col2:
-        if st.button("🔄 Refresh Data"):
+        if st.button("Refresh Data"):
             generate_live_prediction()
     with col3:
         live_mode = st.toggle("Live Mode (10s)", value=st.session_state.live_mode)
@@ -128,7 +144,7 @@ def show_current_status():
         color = get_risk_color(risk_level)
         
         st.metric(
-            label="🎯 Rockfall Probability",
+            label="Rockfall Probability",
             value=f"{probability:.1%}",
             delta=f"{risk_level} Risk"
         )
@@ -139,11 +155,11 @@ def show_current_status():
         humidity = latest_data['humidity']
         
         st.metric(
-            label="🌡️ Temperature",
+            label="Temperature",
             value=f"{temp:.1f}°C"
         )
         st.metric(
-            label="💧 Humidity",
+            label="Humidity",
             value=f"{humidity:.1f}%"
         )
     
@@ -152,11 +168,11 @@ def show_current_status():
         wind_speed = latest_data['wind_speed']
         
         st.metric(
-            label="🌧️ Rainfall",
+            label="Rainfall",
             value=f"{rainfall:.1f}mm"
         )
         st.metric(
-            label="💨 Wind Speed",
+            label="Wind Speed",
             value=f"{wind_speed:.1f}km/h"
         )
     
@@ -165,24 +181,31 @@ def show_current_status():
         slope_angle = latest_data['slope_angle']
         
         st.metric(
-            label="🌱 Soil Moisture",
+            label="Soil Moisture",
             value=f"{soil_moisture:.1f}%"
         )
         st.metric(
-            label="📐 Slope Angle",
+            label="Slope Angle",
             value=f"{slope_angle:.1f}°"
         )
 
 def show_risk_analysis():
     """Display risk heatmap and detailed analysis"""
     
-    st.subheader("📊 Risk Analysis")
+    st.subheader(" Risk Analysis")
+    
+    # Add 3D Map Visualization
+    st.subheader("3D Mine Site Visualization")
+    st.markdown(
+        f'<iframe src="https://lovable.dev/projects/35cbc61a-de3b-49f4-99d1-04c102cb68e5" width="100%" height="600" scrolling="yes"></iframe>',
+        unsafe_allow_html=True
+    )
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
         # Risk heatmap
-        st.subheader("🗺️ Risk Heatmap")
+        st.subheader("Risk Heatmap")
         heatmap_data = create_risk_heatmap()
         
         fig = px.imshow(
@@ -221,7 +244,7 @@ def show_risk_analysis():
 def show_historical_trends():
     """Display historical trends and patterns"""
     
-    st.subheader("📈 Historical Trends")
+    st.subheader(" Historical Trends")
     
     if len(st.session_state.prediction_data) < 2:
         st.info("Generating more data points to show trends...")
@@ -278,7 +301,7 @@ def show_historical_trends():
 def show_alert_system():
     """Display alert system and recommendations"""
     
-    st.subheader("🚨 Alert System")
+    st.subheader("Alert System")
     
     if not st.session_state.prediction_data:
         return
@@ -289,30 +312,30 @@ def show_alert_system():
     
     # Alert status
     if risk_level == 'High':
-        st.error(f"🚨 HIGH RISK ALERT - Probability: {probability:.1%}")
+        st.error(f"HIGH RISK ALERT - Probability: {probability:.1%}")
         st.markdown("**Recommended Actions:**")
-        st.markdown("- ⛔ Evacuate personnel from high-risk areas immediately")
-        st.markdown("- 📞 Alert emergency response team")
-        st.markdown("- 🔒 Restrict access to unstable slopes")
-        st.markdown("- 📊 Increase monitoring frequency")
+        st.markdown("- Evacuate personnel from high-risk areas immediately")
+        st.markdown("-Alert emergency response team")
+        st.markdown("- Restrict access to unstable slopes")
+        st.markdown("-Increase monitoring frequency")
         
     elif risk_level == 'Medium':
-        st.warning(f"⚠️ MEDIUM RISK - Probability: {probability:.1%}")
+        st.warning(f"MEDIUM RISK - Probability: {probability:.1%}")
         st.markdown("**Recommended Actions:**")
-        st.markdown("- 👥 Reduce personnel in potentially affected areas")
-        st.markdown("- 🔍 Increase visual inspections")
-        st.markdown("- 📡 Enhanced sensor monitoring")
-        st.markdown("- 📋 Review safety protocols")
+        st.markdown("- Reduce personnel in potentially affected areas")
+        st.markdown("- Increase visual inspections")
+        st.markdown("- Enhanced sensor monitoring")
+        st.markdown("- Review safety protocols")
         
     else:
-        st.success(f"✅ LOW RISK - Probability: {probability:.1%}")
+        st.success(f"LOW RISK - Probability: {probability:.1%}")
         st.markdown("**Current Status:**")
-        st.markdown("- ✅ Normal operations can continue")
-        st.markdown("- 🔄 Maintain standard monitoring procedures")
-        st.markdown("- 📅 Continue routine inspections")
+        st.markdown("- Normal operations can continue")
+        st.markdown("- Maintain standard monitoring procedures")
+        st.markdown("- Continue routine inspections")
     
     # Recent alerts log
-    st.subheader("📋 Recent Alerts Log")
+    st.subheader("Recent Alerts Log")
     
     alert_data = []
     for data in st.session_state.prediction_data[-10:]:
@@ -333,7 +356,7 @@ def show_alert_system():
 def show_data_generation():
     """Data generation interface"""
     
-    st.subheader("🔧 Synthetic Data Generation")
+    st.subheader("Synthetic Data Generation")
     
     col1, col2 = st.columns([2, 1])
     
@@ -348,10 +371,10 @@ def show_data_generation():
     
     with col2:
         if st.session_state.data_generated:
-            st.success("✅ Training data ready")
+            st.success("Training data ready")
             st.info(f"Dataset: {DATASET_SIZE} samples")
         else:
-            st.warning("⏳ No training data")
+            st.warning("No training data")
     
     # Data generation controls
     st.subheader("Generation Settings")
@@ -382,7 +405,7 @@ def show_data_generation():
         )
     
     # Generate data button
-    if st.button("🎲 Generate Training Data", type="primary"):
+    if st.button("Generate Training Data", type="primary"):
         with st.spinner("Generating synthetic data..."):
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -403,26 +426,26 @@ def show_data_generation():
                 generator.generate_complete_dataset(progress_callback=update_progress)
                 
                 st.session_state.data_generated = True
-                st.success(f"✅ Successfully generated {dataset_size} training samples!")
+                st.success("Successfully generated {dataset_size} training samples!")
                 
                 # Show data preview
                 show_data_preview(generator)
                 
             except Exception as e:
-                st.error(f"❌ Error generating data: {str(e)}")
+                st.error(f"Error generating data: {str(e)}")
     
     # Data preview section
     if st.session_state.data_generated:
-        st.subheader("📊 Data Preview")
+        st.subheader("Data Preview")
         show_data_summary()
 
 def show_model_training():
     """Model training interface"""
     
-    st.subheader("🤖 Model Training")
+    st.subheader("Model Training")
     
     if not st.session_state.data_generated:
-        st.warning("⚠️ Please generate training data first.")
+        st.warning("Please generate training data first.")
         return
     
     # Training configuration
@@ -438,11 +461,11 @@ def show_model_training():
     
     with col2:
         if st.session_state.model_trained:
-            st.success("✅ Models trained and ready")
+            st.success("Models trained and ready")
             if os.path.exists(CNN_MODEL_PATH) and os.path.exists(RF_MODEL_PATH):
-                st.info("📁 Model files saved")
+                st.info("Model files saved")
         else:
-            st.warning("⏳ Models not trained")
+            st.warning("Models not trained")
     
     # Training parameters
     st.subheader("Training Configuration")
@@ -465,7 +488,7 @@ def show_model_training():
         )
     
     # Training button
-    if st.button("🚀 Train Models", type="primary"):
+    if st.button("Train Models", type="primary"):
         with st.spinner("Training models... This may take a few minutes."):
             
             try:
@@ -482,15 +505,11 @@ def show_model_training():
                 
                 trainer.load_data()
                 
-                # Train CNN
-                status_text.text("Training CNN model...")
+                # Train KNN
+                status_text.text("Training KNN model...")
                 progress_bar.progress(0.2)
                 
-                cnn_history = trainer.train_cnn_model(
-                    epochs=epochs,
-                    batch_size=batch_size,
-                    learning_rate=learning_rate
-                )
+                knn_metrics = trainer.train_knn_model()
                 
                 progress_bar.progress(0.6)
                 
@@ -508,21 +527,21 @@ def show_model_training():
                 status_text.text("Training completed!")
                 
                 st.session_state.model_trained = True
-                st.success("✅ Models trained successfully!")
+                st.success("Models trained successfully!")
                 
                 # Show training results
-                show_training_results(cnn_history, rf_metrics)
+                show_training_results(knn_metrics, rf_metrics)
                 
             except Exception as e:
-                st.error(f"❌ Training failed: {str(e)}")
+                st.error(f"Training failed: {str(e)}")
 
 def show_settings():
     """System settings and configuration"""
     
-    st.subheader("⚙️ System Settings")
+    st.subheader("System Settings")
     
     # Alert thresholds
-    st.subheader("🚨 Alert Thresholds")
+    st.subheader("Alert Thresholds")
     
     col1, col2 = st.columns(2)
     
@@ -547,7 +566,7 @@ def show_settings():
         )
     
     # Update interval
-    st.subheader("🔄 Data Update Settings")
+    st.subheader("Data Update Settings")
     
     update_interval = st.number_input(
         "Live Update Interval (seconds)",
@@ -557,81 +576,43 @@ def show_settings():
     )
     
     # Model retraining
-    st.subheader("🔄 Model Management")
+    st.subheader("Model Management")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🗑️ Clear Training Data"):
+        if st.button("Clear Training Data"):
             if st.button("Confirm Clear Data", type="secondary"):
                 clear_training_data()
                 st.success("Training data cleared")
     
     with col2:
-        if st.button("🗑️ Reset Models"):
+        if st.button("Reset Models"):
             if st.button("Confirm Reset Models", type="secondary"):
                 reset_models()
                 st.success("Models reset")
     
     # System information
-    st.subheader("ℹ️ System Information")
+    st.subheader("System Information")
     
     info_col1, info_col2 = st.columns(2)
     
     with info_col1:
         st.markdown("**Data Status:**")
-        st.write(f"- Training Data: {'✅ Ready' if st.session_state.data_generated else '❌ Not Generated'}")
-        st.write(f"- Models: {'✅ Trained' if st.session_state.model_trained else '❌ Not Trained'}")
+        st.write(f"- Training Data: {'Ready' if st.session_state.data_generated else 'Not Generated'}")
+        st.write(f"- Models: {'Trained' if st.session_state.model_trained else 'Not Trained'}")
         st.write(f"- Prediction History: {len(st.session_state.prediction_data)} records")
     
     with info_col2:
         st.markdown("**File System:**")
-        st.write(f"- CNN Model: {'✅ Found' if os.path.exists(CNN_MODEL_PATH) else '❌ Missing'}")
-        st.write(f"- RF Model: {'✅ Found' if os.path.exists(RF_MODEL_PATH) else '❌ Missing'}")
-        st.write(f"- Scaler: {'✅ Found' if os.path.exists(SCALER_PATH) else '❌ Missing'}")
-
-def generate_live_prediction():
-    """Generate a new prediction with current timestamp"""
-    
-    try:
-        predictor = RockfallPredictor()
-        
-        # Generate synthetic current conditions
-        data_generator = RockfallDataGenerator(dataset_size=1)
-        image, tabular_data, _ = data_generator.generate_single_sample()
-        
-        # Make prediction
-        probability, risk_level = predictor.predict(image, tabular_data)
-        
-        # Create prediction record
-        prediction_record = {
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'probability': probability,
-            'risk_level': risk_level,
-            'temperature': tabular_data[0],
-            'humidity': tabular_data[1], 
-            'rainfall': tabular_data[2],
-            'wind_speed': tabular_data[3],
-            'soil_moisture': tabular_data[4],
-            'slope_angle': tabular_data[5]
-        }
-        
-        # Store in session state
-        st.session_state.prediction_data.append(prediction_record)
-        
-        # Keep only last 100 records
-        if len(st.session_state.prediction_data) > 100:
-            st.session_state.prediction_data = st.session_state.prediction_data[-100:]
-        
-        st.session_state.last_update = datetime.now()
-        
-    except Exception as e:
-        st.error(f"Error generating prediction: {str(e)}")
+        st.write(f"- CNN Model: {'Found' if os.path.exists(CNN_MODEL_PATH) else 'Missing'}")
+        st.write(f"- RF Model: {'Found' if os.path.exists(RF_MODEL_PATH) else 'Missing'}")
+        st.write(f"- Scaler: {'Found' if os.path.exists(SCALER_PATH) else 'Missing'}")
 
 def show_data_preview(generator):
     """Show preview of generated data"""
     
-    st.subheader("📊 Generated Data Preview")
+    st.subheader("Generated Data Preview")
     
     # Sample images
     col1, col2 = st.columns(2)
@@ -649,76 +630,25 @@ def show_data_preview(generator):
             fig = px.bar(x=risk_dist.index, y=risk_dist.values, title="Risk Level Distribution")
             st.plotly_chart(fig, use_container_width=True)
 
-def show_data_summary():
-    """Show summary of existing training data"""
-    
-    try:
-        # Load and display data statistics
-        if os.path.exists(TABULAR_DATA_PATH):
-            df = pd.read_csv(TABULAR_DATA_PATH)
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Dataset Statistics:**")
-                st.write(f"Total samples: {len(df)}")
-                st.write(f"Features: {len(df.columns)-1}")
-                
-                if 'risk_level' in df.columns:
-                    risk_counts = df['risk_level'].value_counts()
-                    st.write("Risk distribution:")
-                    for risk, count in risk_counts.items():
-                        st.write(f"  - {risk}: {count} ({count/len(df)*100:.1f}%)")
-            
-            with col2:
-                st.markdown("**Feature Correlations:**")
-                numeric_cols = df.select_dtypes(include=[np.number]).columns
-                if len(numeric_cols) > 1:
-                    corr_matrix = df[numeric_cols].corr()
-                    fig = px.imshow(corr_matrix, title="Feature Correlation Matrix")
-                    st.plotly_chart(fig, use_container_width=True)
-        
-    except Exception as e:
-        st.error(f"Error loading data summary: {str(e)}")
-
-def show_training_results(cnn_history, rf_metrics):
+def show_training_results(knn_metrics, rf_metrics):
     """Display training results and metrics"""
     
-    st.subheader("📈 Training Results")
+    st.subheader("Training Results")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("**CNN Training History:**")
-        if cnn_history:
-            # Plot training history
-            fig = make_subplots(
-                rows=2, cols=1,
-                subplot_titles=['Model Accuracy', 'Model Loss']
-            )
+        st.markdown("**KNN Model Metrics:**")
+        if knn_metrics:
+            st.metric("Accuracy", f"{knn_metrics['accuracy']:.4f}")
+            st.write("**Classification Report:**")
+            st.text(knn_metrics['classification_report'])
             
-            epochs = range(1, len(cnn_history['accuracy']) + 1)
-            
-            fig.add_trace(
-                go.Scatter(x=list(epochs), y=cnn_history['accuracy'], name='Training Accuracy'),
-                row=1, col=1
-            )
-            fig.add_trace(
-                go.Scatter(x=list(epochs), y=cnn_history['val_accuracy'], name='Validation Accuracy'),
-                row=1, col=1
-            )
-            
-            fig.add_trace(
-                go.Scatter(x=list(epochs), y=cnn_history['loss'], name='Training Loss'),
-                row=2, col=1
-            )
-            fig.add_trace(
-                go.Scatter(x=list(epochs), y=cnn_history['val_loss'], name='Validation Loss'),
-                row=2, col=1
-            )
-            
-            fig.update_layout(height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            # Display confusion matrix
+            st.write("**Confusion Matrix:**")
+            if os.path.exists("knn_confusion_matrix.png"):
+                st.image("knn_confusion_matrix.png")
+    
     
     with col2:
         st.markdown("**Random Forest Metrics:**")
@@ -771,6 +701,116 @@ def reset_models():
     for path in [CNN_MODEL_PATH, RF_MODEL_PATH, SCALER_PATH]:
         if os.path.exists(path):
             os.remove(path)
+
+def generate_live_prediction():
+    """Generate a new prediction with current timestamp"""
+    
+    try:
+        predictor = RockfallPredictor()
+        
+        # Generate synthetic rockfall parameters
+        rockfall_params = {
+            'slope_angle': round(random.uniform(20, 70), 1),
+            'rock_mass': round(random.uniform(10, 500), 1),
+            'rock_density': round(random.uniform(2000, 3000), 1),
+            'rock_shape': random.choice(['angular', 'rounded', 'irregular']),
+            'friction_angle': round(random.uniform(20, 45), 1),
+            'restitution_coefficient': round(random.uniform(0.3, 0.9), 2),
+            'slope_roughness': round(random.uniform(0.01, 0.2), 2),
+            'vegetation': random.choice(['none', 'light', 'moderate', 'heavy']),
+            'water_content': round(random.uniform(0, 0.4), 2),
+            'temperature': round(random.uniform(-10, 40), 1),
+            'rainfall': round(random.uniform(0, 100), 1),
+            'seismic_events': random.choice([0, 0, 0, 1, 2]),
+            'release_point': round(random.uniform(10, 200), 1)
+        }
+        
+        # Make prediction with tabular data only
+        probability, risk_level = predictor.predict(tabular_data=rockfall_params)
+        
+        # Create prediction record with all required keys for dashboard
+        prediction_record = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'probability': probability,
+            'risk_level': risk_level,
+            'temperature': rockfall_params.get('temperature', 25.0),
+            'humidity': rockfall_params.get('humidity', 50.0),
+            'rainfall': rockfall_params.get('rainfall', 0.0),
+            'wind_speed': rockfall_params.get('wind_speed', 5.0),
+            'soil_moisture': rockfall_params.get('soil_moisture', 20.0),
+            'slope_angle': rockfall_params.get('slope_angle', 30.0),
+            'rock_mass': rockfall_params.get('rock_mass', 100.0),
+            'vegetation': rockfall_params.get('vegetation', 'none'),
+            'seismic_events': rockfall_params.get('seismic_events', 0)
+        }
+        
+        # Store in session state
+        st.session_state.prediction_data.append(prediction_record)
+        
+        # Keep only last 100 records
+        if len(st.session_state.prediction_data) > 100:
+            st.session_state.prediction_data = st.session_state.prediction_data[-100:]
+        
+        st.session_state.last_update = datetime.now()
+        
+    except Exception as e:
+        st.error(f"Error generating prediction: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+
+
+def show_data_summary():
+    """Display summary of generated data"""
+    try:
+        # Load and display image data summary
+        images = np.load('data/dem_images.npy')
+        st.write("**Image Data Summary:**")
+        st.write(f"- Number of images: {len(images)}")
+        st.write(f"- Image dimensions: {images.shape[1:3]}")
+        st.write(f"- Image channels: {images.shape[3]}")
+        
+        # Display sample images
+        st.write("**Sample Images:**")
+        cols = st.columns(4)
+        for i, col in enumerate(cols):
+            if i < len(images):
+                col.image(images[i], caption=f"Sample {i+1}", use_container_width=True)
+        
+        # Load and display tabular data summary
+        df = pd.read_csv('data/tabular_features.csv')
+        st.write("\n**Tabular Data Summary:**")
+        st.write(f"- Number of samples: {len(df)}")
+        st.write(f"- Number of features: {len(df.columns) - 2}")  # Excluding risk_level and probability
+        
+        # Display risk level distribution
+        risk_dist = df['risk_level'].value_counts()
+        st.write("\n**Risk Level Distribution:**")
+        st.bar_chart(risk_dist)
+        
+        # Display feature statistics - exclude non-numeric columns
+        st.write("\n**Feature Statistics:**")
+        numeric_df = df.drop(columns=['risk_level'])
+        st.dataframe(numeric_df.describe())
+        
+        # Display correlation heatmap - only for numeric columns
+        st.write("\n**Feature Correlations:**")
+        try:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            
+            # Calculate correlation only for numeric columns
+            corr = numeric_df.corr()
+            fig, ax = plt.subplots(figsize=(10, 8))
+            sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax)
+            st.pyplot(fig)
+            plt.close()
+        except Exception as e:
+            st.error(f"Error generating correlation heatmap: {str(e)}")
+        
+    except Exception as e:
+        st.error(f"Error displaying data summary: {str(e)}")
+        st.info("Please generate data first using the options above.")
+
 
 if __name__ == "__main__":
     main()

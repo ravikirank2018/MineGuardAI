@@ -73,65 +73,143 @@ class RockfallDataGenerator:
         return dem_image
     
     def generate_tabular_features(self, risk_level='Low'):
-        """Generate synthetic tabular data (weather, soil, geological parameters)"""
+        """Generate synthetic tabular data for rockfall prediction with comprehensive parameters"""
         
-        # Weather parameters
+        # 1. Slope Geometry Parameters
         if risk_level == 'High':
-            temperature = np.random.normal(25, 10)  # Higher temperature variation
-            humidity = np.random.uniform(70, 95)     # High humidity
-            rainfall = np.random.uniform(50, 200)    # Heavy rainfall
-            wind_speed = np.random.uniform(20, 60)   # Strong winds
+            slope_height = np.random.uniform(50, 100)        # Higher slopes (meters)
+            slope_angle = np.random.uniform(60, 85)          # Steeper slopes (degrees)
+            slope_length = np.random.uniform(100, 200)       # Longer slopes (meters)
+            surface_roughness = np.random.uniform(0.1, 0.3)  # Low roughness (dimensionless)
+            # 1=Convex, 2=Planar, 3=Concave, 4=Stepped
+            slope_profile = np.random.choice([1, 4], p=[0.7, 0.3])  # Mostly convex or stepped
         elif risk_level == 'Medium':
-            temperature = np.random.normal(20, 5)
-            humidity = np.random.uniform(50, 80)
-            rainfall = np.random.uniform(10, 60)
-            wind_speed = np.random.uniform(5, 25)
+            slope_height = np.random.uniform(30, 60)
+            slope_angle = np.random.uniform(40, 65)
+            slope_length = np.random.uniform(60, 120)
+            surface_roughness = np.random.uniform(0.3, 0.6)
+            slope_profile = np.random.choice([1, 2, 3, 4], p=[0.3, 0.4, 0.2, 0.1])
         else:  # Low risk
-            temperature = np.random.normal(18, 3)
-            humidity = np.random.uniform(30, 60)
-            rainfall = np.random.uniform(0, 20)
-            wind_speed = np.random.uniform(0, 15)
+            slope_height = np.random.uniform(10, 35)
+            slope_angle = np.random.uniform(20, 45)
+            slope_length = np.random.uniform(30, 70)
+            surface_roughness = np.random.uniform(0.5, 0.8)
+            slope_profile = np.random.choice([2, 3], p=[0.6, 0.4])  # Mostly planar or concave
         
-        # Soil parameters
+        # 2. Rock/Block Parameters
         if risk_level == 'High':
-            soil_moisture = np.random.uniform(25, 40)    # High moisture
-            soil_density = np.random.uniform(1.2, 1.6)   # Low density (loose soil)
-            cohesion = np.random.uniform(5, 15)          # Low cohesion
-            friction_angle = np.random.uniform(15, 25)   # Low friction
+            block_size = np.random.uniform(1.0, 5.0)         # Large blocks (m³)
+            block_mass = block_size * np.random.uniform(2500, 3000)  # Mass (kg)
+            # 1=Angular, 2=Round, 3=Irregular
+            block_shape = np.random.choice([1, 3], p=[0.7, 0.3])  # Mostly angular
+            material_strength = np.random.uniform(20, 50)     # Low strength (MPa)
+            restitution_normal = np.random.uniform(0.5, 0.8)  # High bounce
+            restitution_tangential = np.random.uniform(0.7, 0.9)
+            friction_coefficient = np.random.uniform(0.1, 0.3)  # Low friction
         elif risk_level == 'Medium':
-            soil_moisture = np.random.uniform(15, 30)
-            soil_density = np.random.uniform(1.4, 1.8)
-            cohesion = np.random.uniform(10, 25)
-            friction_angle = np.random.uniform(20, 35)
+            block_size = np.random.uniform(0.5, 2.0)
+            block_mass = block_size * np.random.uniform(2300, 2800)
+            block_shape = np.random.choice([1, 2, 3], p=[0.4, 0.2, 0.4])
+            material_strength = np.random.uniform(40, 80)
+            restitution_normal = np.random.uniform(0.3, 0.6)
+            restitution_tangential = np.random.uniform(0.5, 0.8)
+            friction_coefficient = np.random.uniform(0.3, 0.5)
         else:  # Low risk
-            soil_moisture = np.random.uniform(5, 20)
-            soil_density = np.random.uniform(1.6, 2.2)
-            cohesion = np.random.uniform(20, 40)
-            friction_angle = np.random.uniform(30, 45)
+            block_size = np.random.uniform(0.1, 0.8)
+            block_mass = block_size * np.random.uniform(2200, 2600)
+            block_shape = np.random.choice([2, 3], p=[0.6, 0.4])  # Mostly round
+            material_strength = np.random.uniform(70, 120)
+            restitution_normal = np.random.uniform(0.1, 0.4)
+            restitution_tangential = np.random.uniform(0.3, 0.6)
+            friction_coefficient = np.random.uniform(0.5, 0.8)  # High friction
         
-        # Geological parameters
+        # 3. Environmental & Triggering Parameters
         if risk_level == 'High':
-            slope_angle = np.random.uniform(45, 75)      # Steep slopes
-            fracture_density = np.random.uniform(0.6, 1.0)  # High fracturing
-            rock_quality = np.random.uniform(0.1, 0.4)   # Poor rock quality
+            moisture_content = np.random.uniform(20, 40)      # High moisture (%)
+            freeze_thaw_cycles = np.random.randint(15, 30)    # Many cycles per year
+            vegetation_cover = np.random.uniform(0, 20)       # Low vegetation (%)
+            temperature_variation = np.random.uniform(15, 30) # High variation (°C)
+            seismic_activity = np.random.uniform(0.5, 1.0)    # High activity (scaled 0-1)
         elif risk_level == 'Medium':
-            slope_angle = np.random.uniform(25, 50)
-            fracture_density = np.random.uniform(0.3, 0.7)
-            rock_quality = np.random.uniform(0.3, 0.7)
+            moisture_content = np.random.uniform(10, 25)
+            freeze_thaw_cycles = np.random.randint(5, 20)
+            vegetation_cover = np.random.uniform(20, 50)
+            temperature_variation = np.random.uniform(8, 18)
+            seismic_activity = np.random.uniform(0.2, 0.6)
         else:  # Low risk
-            slope_angle = np.random.uniform(5, 30)
-            fracture_density = np.random.uniform(0.1, 0.4)
-            rock_quality = np.random.uniform(0.6, 1.0)
+            moisture_content = np.random.uniform(0, 15)
+            freeze_thaw_cycles = np.random.randint(0, 10)
+            vegetation_cover = np.random.uniform(50, 90)
+            temperature_variation = np.random.uniform(3, 10)
+            seismic_activity = np.random.uniform(0, 0.3)
         
-        # Additional parameters
-        vibration_level = np.random.uniform(0, 5) if risk_level == 'High' else np.random.uniform(0, 2)
-        groundwater_level = np.random.uniform(-10, 5) if risk_level == 'High' else np.random.uniform(-20, -5)
+        # 4. Initial Conditions
+        if risk_level == 'High':
+            release_point_height = np.random.uniform(0.8, 1.0)  # Relative to slope height (0-1)
+            initial_velocity = np.random.uniform(2.0, 5.0)      # m/s
+            initial_angle = np.random.uniform(10, 30)           # degrees from horizontal
+        elif risk_level == 'Medium':
+            release_point_height = np.random.uniform(0.5, 0.8)
+            initial_velocity = np.random.uniform(1.0, 3.0)
+            initial_angle = np.random.uniform(5, 15)
+        else:  # Low risk
+            release_point_height = np.random.uniform(0.2, 0.5)
+            initial_velocity = np.random.uniform(0.0, 1.0)
+            initial_angle = np.random.uniform(0, 10)
+        
+        # 5. Simulation & Output Parameters
+        if risk_level == 'High':
+            runout_distance = np.random.uniform(100, 200)     # meters
+            impact_velocity = np.random.uniform(15, 30)       # m/s
+            kinetic_energy = 0.5 * block_mass * (impact_velocity ** 2)  # Joules
+            bounce_height = np.random.uniform(5, 15)          # meters
+            lateral_dispersion = np.random.uniform(10, 30)    # meters
+            num_bounces = np.random.randint(3, 8)
+        elif risk_level == 'Medium':
+            runout_distance = np.random.uniform(50, 120)
+            impact_velocity = np.random.uniform(8, 18)
+            kinetic_energy = 0.5 * block_mass * (impact_velocity ** 2)
+            bounce_height = np.random.uniform(2, 8)
+            lateral_dispersion = np.random.uniform(5, 15)
+            num_bounces = np.random.randint(5, 12)
+        else:  # Low risk
+            runout_distance = np.random.uniform(10, 60)
+            impact_velocity = np.random.uniform(3, 10)
+            kinetic_energy = 0.5 * block_mass * (impact_velocity ** 2)
+            bounce_height = np.random.uniform(1, 4)
+            lateral_dispersion = np.random.uniform(2, 8)
+            num_bounces = np.random.randint(8, 15)
+        
+        # 6. Historical & Statistical Data
+        if risk_level == 'High':
+            rockfall_frequency = np.random.uniform(5, 10)     # events per year
+            block_volume_distribution = np.random.uniform(0.7, 1.0)  # skewness toward larger blocks
+            historical_runout = np.random.uniform(0.8, 1.0)   # relative to predicted runout
+        elif risk_level == 'Medium':
+            rockfall_frequency = np.random.uniform(2, 6)
+            block_volume_distribution = np.random.uniform(0.4, 0.7)
+            historical_runout = np.random.uniform(0.6, 0.9)
+        else:  # Low risk
+            rockfall_frequency = np.random.uniform(0.5, 3)
+            block_volume_distribution = np.random.uniform(0.1, 0.5)
+            historical_runout = np.random.uniform(0.3, 0.7)
         
         return [
-            temperature, humidity, rainfall, wind_speed,
-            soil_moisture, soil_density, cohesion, friction_angle,
-            slope_angle, fracture_density, rock_quality,
-            vibration_level, groundwater_level
+            # 1. Slope Geometry Parameters
+            slope_height, slope_angle, slope_length, surface_roughness, slope_profile,
+            # 2. Rock/Block Parameters
+            block_size, block_mass, block_shape, material_strength, 
+            restitution_normal, restitution_tangential, friction_coefficient,
+            # 3. Environmental & Triggering Parameters
+            moisture_content, freeze_thaw_cycles, vegetation_cover, 
+            temperature_variation, seismic_activity,
+            # 4. Initial Conditions
+            release_point_height, initial_velocity, initial_angle,
+            # 5. Simulation & Output Parameters
+            runout_distance, impact_velocity, kinetic_energy, 
+            bounce_height, lateral_dispersion, num_bounces,
+            # 6. Historical & Statistical Data
+            rockfall_frequency, block_volume_distribution, historical_runout
         ]
     
     def generate_single_sample(self):
@@ -160,10 +238,21 @@ class RockfallDataGenerator:
         self.labels = []
         
         feature_names = [
-            'temperature', 'humidity', 'rainfall', 'wind_speed',
-            'soil_moisture', 'soil_density', 'cohesion', 'friction_angle',
-            'slope_angle', 'fracture_density', 'rock_quality',
-            'vibration_level', 'groundwater_level'
+            # 1. Slope Geometry Parameters
+            'slope_height', 'slope_angle', 'slope_length', 'surface_roughness', 'slope_profile',
+            # 2. Rock/Block Parameters
+            'block_size', 'block_mass', 'block_shape', 'material_strength',
+            'restitution_normal', 'restitution_tangential', 'friction_coefficient',
+            # 3. Environmental & Triggering Parameters
+            'moisture_content', 'freeze_thaw_cycles', 'vegetation_cover',
+            'temperature_variation', 'seismic_activity',
+            # 4. Initial Conditions
+            'release_point_height', 'initial_velocity', 'initial_angle',
+            # 5. Simulation & Output Parameters
+            'runout_distance', 'impact_velocity', 'kinetic_energy',
+            'bounce_height', 'lateral_dispersion', 'num_bounces',
+            # 6. Historical & Statistical Data
+            'rockfall_frequency', 'block_volume_distribution', 'historical_runout'
         ]
         
         for i in range(self.dataset_size):
